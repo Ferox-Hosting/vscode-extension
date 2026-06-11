@@ -1,0 +1,99 @@
+{
+  "name": "calagopus",
+  "icon": "icon.png",
+  "displayName": "Calagopus",
+  "description": "Browse and edit Calagopus server files and access the server console directly from VS Code.",
+  "version": "0.1.0",
+  "publisher": "calagopus",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/calagopus/vscode-extension.git"
+  },
+  "engines": {
+    "vscode": "^1.120.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "activationEvents": [
+    "onFileSystem:calagopus",
+    "onUri"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "calagopus.signIn",
+        "title": "Sign In",
+        "category": "Calagopus"
+      },
+      {
+        "command": "calagopus.signOut",
+        "title": "Sign Out",
+        "category": "Calagopus"
+      },
+      {
+        "command": "calagopus.openServer",
+        "title": "Open Server Files",
+        "category": "Calagopus"
+      },
+      {
+        "command": "calagopus.openConsole",
+        "title": "Open Server Console",
+        "category": "Calagopus"
+      },
+      {
+        "command": "calagopus.powerAction",
+        "title": "Server Power Action",
+        "category": "Calagopus"
+      }
+    ],
+    "terminal": {
+      "profiles": [
+        {
+          "id": "calagopus.console",
+          "title": "Calagopus Console",
+          "icon": "server-environment"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "vscode:prepublish": "pnpm typecheck && pnpm compile -- --production",
+    "package": "vsce package --no-dependencies --out dist/calagopus.vsix",
+    "code:install": "code --install-extension dist/calagopus.vsix",
+    "code:install-dev": "pnpm compile && pnpm package && pnpm code:install",
+    "biome:validate": "biome format --css-parse-tailwind-directives=true && biome lint --css-parse-tailwind-directives=true && biome check",
+    "biome:fix": "biome format --write --css-parse-tailwind-directives=true && biome lint --write --css-parse-tailwind-directives=true && biome check --write",
+    "biome:fix-unsafe": "biome format --write --css-parse-tailwind-directives=true && biome lint --write --css-parse-tailwind-directives=true && biome check --write --unsafe"
+  },
+  "dependencies": {
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.16",
+    "@types/node": "^20.19.42",
+    "@types/vscode": "^1.120.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.9.3"
+  },
+  "enabledApiProposals": [
+    "textSearchProvider2",
+    "fileSearchProvider2"
+  ]
+}

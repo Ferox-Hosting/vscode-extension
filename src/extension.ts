@@ -6,6 +6,7 @@ import { ServersViewProvider, type ServerNode } from './serversView.ts';
 import {
   type MountedServer,
   mountedServers,
+  mountWillReload,
   openServerFolder,
   pickMountedServer,
   pickServer,
@@ -141,7 +142,16 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
       statusBar.pin(server.origin, server.uuid, server.name);
+      // Mounting a fresh server as the first workspace folder reloads the window;
+      // stash the intent so the explorer is revealed once we come back up.
+      const willReload = mountWillReload(server);
+      if (willReload) {
+        await context.globalState.update(PENDING_EXPLORER_KEY, true);
+      }
       await openServerFolder(server);
+      if (!willReload) {
+        await vscode.commands.executeCommand('workbench.view.explorer');
+      }
     }),
 
     vscode.commands.registerCommand('ferox.serverOpenConsole', async (node?: ServerNode) => {

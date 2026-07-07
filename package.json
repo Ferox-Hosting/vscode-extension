@@ -142,16 +142,6 @@
           "command": "ferox.serverOpenFiles",
           "when": "view == ferox.servers && viewItem == feroxServer",
           "group": "inline@1"
-        },
-        {
-          "command": "ferox.serverOpenConsole",
-          "when": "view == ferox.servers && viewItem == feroxServer",
-          "group": "inline@2"
-        },
-        {
-          "command": "ferox.serverPower",
-          "when": "view == ferox.servers && viewItem == feroxServer",
-          "group": "inline@3"
         }
       ]
     },
@@ -185,6 +175,7 @@
     "@types/node": "^20.19.42",
     "@types/vscode": "^1.120.0",
     "@types/ws": "^8.18.1",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.0",
     "typescript": "^5.9.3"
   }

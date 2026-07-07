@@ -18,6 +18,7 @@ function toServer(item: FractalItem<ServerAttributes>): Server {
     uuid_short: attributes.identifier,
     name: attributes.name,
     description: attributes.description,
+    suspended: attributes.suspended === true,
   };
 }
 

@@ -22,6 +22,7 @@ export interface Server {
   uuid_short: string;
   name: string;
   description: string | null;
+  suspended: boolean;
 }
 
 // Pterodactyl 0.7.x wraps every resource in a Fractal envelope. A single
@@ -53,6 +54,10 @@ export interface ServerAttributes {
   uuid: string;
   name: string;
   description: string | null;
+  // Emitted by the panel's client ServerTransformer. Optional so the extension
+  // still tolerates an older panel build that predates the field (treated as
+  // not suspended).
+  suspended?: boolean;
 }
 
 export interface WebsocketCredentials {

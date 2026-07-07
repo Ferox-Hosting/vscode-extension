@@ -79,7 +79,13 @@ export class FeroxUriHandler implements vscode.UriHandler {
 
     let name = shortId(server);
     try {
-      name = (await client.getServer(server)).name || name;
+      const fetched = await client.getServer(server);
+      name = fetched.name || name;
+      if (fetched.suspended) {
+        log.info(`uri handler: refusing to open suspended server ${server}`);
+        vscode.window.showWarningMessage(`Ferox: "${name}" is suspended and cannot be opened.`);
+        return;
+      }
     } catch (err) {
       log.warn(`uri handler: could not fetch name for server ${server}: ${err}`);
     }

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ApiError, PanelClient } from './api/client.ts';
+import { authenticateViaBrowser, DEFAULT_CREATE_PATH } from './auth.ts';
 import { log } from './log.ts';
 
 const ORIGINS_KEY = 'ferox.origins';
@@ -97,30 +98,15 @@ export class Session {
       return null;
     }
 
-    const apiKey = await vscode.window.showInputBox({
-      title: 'Ferox: API Key',
-      prompt: 'A client API key (Account Settings -> API Keys)',
-      password: true,
-      ignoreFocusOut: true,
-      validateInput: (value) => (value.trim().length === 0 ? 'API key is required' : null),
-    });
-    if (!apiKey) {
+    // Approve in the browser (the panel mints a key and hands it back over a loopback callback).
+    // Pasting a key manually still works as a fallback during the wait — see authenticateViaBrowser.
+    const normalizedOrigin = new URL(origin).origin;
+    const key = await authenticateViaBrowser(normalizedOrigin, DEFAULT_CREATE_PATH);
+    if (!key) {
       return null;
     }
 
-    const candidate = new PanelClient({ origin: new URL(origin).origin, apiKey: apiKey.trim() });
-    if (!(await this.verify(candidate))) {
-      return null;
-    }
-
-    await this.remember(candidate.origin, apiKey.trim());
-    const client = this.makeClient(candidate.origin, apiKey.trim());
-    this.clients.set(client.origin, client);
-    this.ephemeral.delete(client.origin);
-    this.didChangeEmitter.fire();
-
-    vscode.window.showInformationMessage(`Ferox: signed in to ${client.origin}.`);
-    return client;
+    return this.signInWithKey(normalizedOrigin, key);
   }
 
   async ephemeralClient(origin: string, apiKey: string): Promise<PanelClient | null> {

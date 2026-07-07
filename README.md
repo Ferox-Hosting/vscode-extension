@@ -10,7 +10,6 @@ Browse and edit [Ferox Hosting](https://feroxhosting.nl) server files and access
 
 - Mount server files as a workspace folder over a virtual `ferox://` filesystem.
 - Edit, create, rename, and delete files and directories remotely with native VS Code tooling.
-- Search across server files by name and content (when the proposed search APIs are enabled).
 - Attach to the live server console as an integrated terminal, with full output streaming and command input.
 - View server state in the status bar and trigger power actions (start, stop, restart, kill).
 - Open servers and consoles via deep links using the `ferox` URI handler.
@@ -31,7 +30,7 @@ Browse and edit [Ferox Hosting](https://feroxhosting.nl) server files and access
 The extension registers a `ferox` URI handler. Open a server (mounting its files as a workspace folder) with:
 
 ```
-vscode://ferox.ferox/open?origin=<panel-url>&server=<server-uuid>
+vscode://FeroxHosting.ferox/open?origin=<panel-url>&server=<server-uuid>
 ```
 
 | Param | Description |

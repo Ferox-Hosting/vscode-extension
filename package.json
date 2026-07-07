@@ -3,8 +3,8 @@
   "icon": "icon.png",
   "displayName": "Ferox Hosting",
   "description": "Browse and edit Ferox Hosting server files and access the server console directly from VS Code.",
-  "version": "1.0.0",
-  "publisher": "ferox",
+  "version": "1.0.2",
+  "publisher": "FeroxHosting",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -163,23 +163,13 @@
           "icon": "server-environment"
         }
       ]
-    },
-    "configuration": {
-      "title": "Ferox",
-      "properties": {
-        "ferox.enableSearchProviders": {
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "Register the workspace text/file search providers for `ferox://` folders. These walk the whole remote tree, generating many panel API requests, and can hit the panel's per-user rate limit on large servers. Leave disabled unless you need in-editor search."
-        }
-      }
     }
   },
   "scripts": {
     "compile": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "vscode:prepublish": "pnpm typecheck && pnpm compile -- --production",
+    "vscode:prepublish": "npx tsc --noEmit && node esbuild.mjs --production",
     "package": "vsce package --no-dependencies --out dist/ferox.vsix",
     "code:install": "code --install-extension dist/ferox.vsix",
     "code:install-dev": "pnpm compile && pnpm package && pnpm code:install",
@@ -197,9 +187,5 @@
     "@types/ws": "^8.18.1",
     "esbuild": "^0.28.0",
     "typescript": "^5.9.3"
-  },
-  "enabledApiProposals": [
-    "textSearchProvider2",
-    "fileSearchProvider2"
-  ]
+  }
 }

@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { ConsolePseudoterminal, createConsoleTerminal } from './console/pseudoterminal.ts';
 import { FeroxFileSystem } from './fs/fileSystemProvider.ts';
 import { log } from './log.ts';
-import { FeroxFileSearchProvider, FeroxTextSearchProvider } from './search/searchProvider.ts';
 import { ServersViewProvider, type ServerNode } from './serversView.ts';
 import {
   type MountedServer,
@@ -71,24 +70,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.window.registerUriHandler(new FeroxUriHandler(session, context.globalState, openConsoleFor)),
   );
-
-  // Search providers walk the entire remote tree, which generates a large burst
-  // of panel API requests and can trip the panel's per-user rate limit. They are
-  // opt-in (off by default) so a plain mount stays cheap; enable via the
-  // `ferox.enableSearchProviders` setting.
-  if (vscode.workspace.getConfiguration('ferox').get<boolean>('enableSearchProviders', false)) {
-    try {
-      context.subscriptions.push(
-        vscode.workspace.registerTextSearchProvider2('ferox', new FeroxTextSearchProvider(session)),
-        vscode.workspace.registerFileSearchProvider2('ferox', new FeroxFileSearchProvider(session)),
-      );
-      log.info('search providers registered (proposed API available)');
-    } catch (err) {
-      log.warn(`search providers unavailable (proposed API not enabled): ${err}`);
-    }
-  } else {
-    log.info('search providers disabled (ferox.enableSearchProviders is false)');
-  }
 
   context.subscriptions.push(
     vscode.window.registerTerminalProfileProvider('ferox.console', {

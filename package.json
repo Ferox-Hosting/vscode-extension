@@ -3,7 +3,7 @@
   "icon": "icon.png",
   "displayName": "Ferox Hosting",
   "description": "Browse and edit Ferox Hosting server files and access the server console directly from VS Code.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "FeroxHosting",
   "license": "MIT",
   "repository": {

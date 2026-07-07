@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  PROJECT_NAME: calagopus
+  PROJECT_NAME: ferox
 
 jobs:
   check:

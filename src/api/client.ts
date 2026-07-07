@@ -2,13 +2,24 @@ import type {
   DirectoryEntry,
   DirectoryListResponse,
   FileSearchFilters,
-  Pagination,
+  FractalItem,
+  FractalList,
   PowerAction,
   PublicSettings,
   Server,
-  ServerListResponse,
+  ServerAttributes,
   WebsocketCredentials,
 } from './types.ts';
+
+function toServer(item: FractalItem<ServerAttributes>): Server {
+  const attributes = item.attributes;
+  return {
+    uuid: attributes.uuid,
+    uuid_short: attributes.identifier,
+    name: attributes.name,
+    description: attributes.description,
+  };
+}
 
 export class ApiError extends Error {
   constructor(
@@ -41,8 +52,6 @@ export interface Credentials {
 }
 
 export type ReauthHandler = (client: PanelClient) => Promise<boolean>;
-
-export const UPLOAD_CHUNK_BYTES = 95 * 1024 * 1024;
 
 export class PanelClient {
   readonly origin: string;
@@ -94,64 +103,39 @@ export class PanelClient {
     return this.json<PublicSettings>('/api/settings');
   }
 
-  private async fetchAll<R, T>(buildPath: (page: number) => string, select: (body: R) => Pagination<T>): Promise<T[]> {
-    const items: T[] = [];
+  async listServers(search?: string): Promise<Server[]> {
+    // The 0.7.x client endpoint ignores a free-text search parameter, so any
+    // filtering is left to the caller's quick-pick. We page through the Fractal
+    // envelope until the reported page count is exhausted.
+    const servers: Server[] = [];
     for (let page = 1; ; page++) {
-      const pag = select(await this.json<R>(buildPath(page)));
-      items.push(...pag.data);
-      if (page * pag.per_page >= pag.total || pag.data.length === 0) {
-        return items;
+      const params = new URLSearchParams({ page: `${page}` });
+      if (search) params.set('search', search);
+
+      const body = await this.json<FractalList<ServerAttributes>>(`/api/client/servers?${params}`);
+      servers.push(...body.data.map(toServer));
+
+      const pagination = body.meta?.pagination;
+      if (!pagination || pagination.total_pages <= page || body.data.length === 0) {
+        return servers;
       }
     }
   }
 
-  async listServers(search?: string): Promise<Server[]> {
-    return this.fetchAll(
-      (page) => {
-        const params = new URLSearchParams({ page: `${page}`, per_page: '100' });
-        if (search) params.set('search', search);
-        return `/api/client/servers?${params}`;
-      },
-      (body: ServerListResponse) => body.servers,
-    );
-  }
-
   async getServer(uuid: string): Promise<Server> {
-    const { server } = await this.json<{ server: Server }>(`/api/client/servers/${uuid}`);
-    return server;
+    const body = await this.json<FractalItem<ServerAttributes>>(`/api/client/servers/${uuid}`);
+    return toServer(body);
   }
 
   async listDirectory(server: string, directory: string): Promise<DirectoryEntry[]> {
-    return this.fetchAll(
-      (page) => {
-        const params = new URLSearchParams({ directory, page: `${page}`, per_page: '100', sort: 'name_asc' });
-        return `/api/client/servers/${server}/files/list?${params}`;
-      },
-      (body: DirectoryListResponse) => body.entries,
-    );
+    const params = new URLSearchParams({ directory });
+    const body = await this.json<DirectoryListResponse>(`/api/client/servers/${server}/files/list?${params}`);
+    return body.entries;
   }
 
   async readFile(server: string, file: string): Promise<Uint8Array> {
     const params = new URLSearchParams({ file });
     const response = await this.request(`/api/client/servers/${server}/files/contents?${params}`);
-    return new Uint8Array(await response.arrayBuffer());
-  }
-
-  private async getDownloadUrl(server: string, directory: string, name: string): Promise<string> {
-    const params = new URLSearchParams({ root: directory, directory: 'false' });
-    params.append('files', name);
-    const { url } = await this.json<{ url: string }>(`/api/client/servers/${server}/files/download?${params}`);
-    return url;
-  }
-
-  async downloadFile(server: string, directory: string, name: string): Promise<Uint8Array> {
-    const url = await this.getDownloadUrl(server, directory, name);
-
-    const response = await fetch(url, { headers: { Accept: 'application/octet-stream' } });
-    if (!response.ok) {
-      throw await apiError(response);
-    }
-
     return new Uint8Array(await response.arrayBuffer());
   }
 
@@ -161,90 +145,6 @@ export class PanelClient {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: Buffer.from(content),
-    });
-  }
-
-  private async getUploadUrl(server: string, directory: string): Promise<string> {
-    const { url } = await this.json<{ url: string }>(`/api/client/servers/${server}/files/upload`);
-    return `${url}&directory=${encodeURIComponent(directory)}`;
-  }
-
-  async uploadFile(server: string, directory: string, name: string, content: Uint8Array): Promise<void> {
-    const baseUrl = await this.getUploadUrl(server, directory);
-    const total = content.byteLength;
-
-    if (total <= UPLOAD_CHUNK_BYTES) {
-      await this.uploadChunk(baseUrl, name, content);
-      return;
-    }
-
-    let offset = 0;
-    let continuationToken: string | undefined;
-    while (offset < total) {
-      const end = Math.min(offset + UPLOAD_CHUNK_BYTES, total);
-      const isLast = end >= total;
-
-      const url = new URL(baseUrl);
-      if (!isLast) {
-        url.searchParams.set('wants_continue', '0');
-      }
-      if (continuationToken !== undefined) {
-        url.searchParams.set('continuation_token', continuationToken);
-      }
-
-      const token = await this.uploadChunk(url.toString(), name, content.subarray(offset, end));
-      if (!isLast) {
-        if (!token) {
-          throw new ApiError(500, 'wings did not return a continuation token for a non-final chunk');
-        }
-        continuationToken = token;
-      }
-      offset = end;
-    }
-  }
-
-  private async uploadChunk(url: string, name: string, content: Uint8Array): Promise<string | null> {
-    const form = new FormData();
-    form.append('files', new Blob([content]), name);
-
-    const response = await fetch(url, { method: 'POST', body: form, headers: { Accept: 'application/json' } });
-    if (!response.ok) {
-      throw await apiError(response);
-    }
-
-    try {
-      const body = (await response.json()) as { continuation_token?: string };
-      return body.continuation_token ?? null;
-    } catch {
-      return null;
-    }
-  }
-
-  async copy(server: string, path: string, name: string): Promise<void> {
-    await this.request(`/api/client/servers/${server}/files/copy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, destination: name, foreground: true }),
-    });
-  }
-
-  async copyRemote(
-    server: string,
-    root: string,
-    files: string[],
-    destination: string,
-    destinationServer: string,
-  ): Promise<void> {
-    await this.request(`/api/client/servers/${server}/files/copy-remote`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        root,
-        files,
-        destination,
-        destination_server: destinationServer,
-        foreground: true,
-      }),
     });
   }
 

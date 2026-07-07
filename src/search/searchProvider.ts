@@ -37,7 +37,7 @@ async function searchServer(
   return client.searchFiles(server, filters);
 }
 
-export class CalagopusFileSearchProvider implements vscode.FileSearchProvider2 {
+export class FeroxFileSearchProvider implements vscode.FileSearchProvider2 {
   constructor(private readonly session: Session) {}
 
   async provideFileSearchResults(
@@ -51,7 +51,7 @@ export class CalagopusFileSearchProvider implements vscode.FileSearchProvider2 {
       if (token.isCancellationRequested || results.length >= options.maxResults) {
         break;
       }
-      if (folder.folder.scheme !== 'calagopus') {
+      if (folder.folder.scheme !== 'ferox') {
         continue;
       }
 
@@ -84,7 +84,7 @@ export class CalagopusFileSearchProvider implements vscode.FileSearchProvider2 {
   }
 }
 
-export class CalagopusTextSearchProvider implements vscode.TextSearchProvider2 {
+export class FeroxTextSearchProvider implements vscode.TextSearchProvider2 {
   constructor(private readonly session: Session) {}
 
   async provideTextSearchResults(
@@ -101,7 +101,7 @@ export class CalagopusTextSearchProvider implements vscode.TextSearchProvider2 {
       if (token.isCancellationRequested) {
         break;
       }
-      if (folder.folder.scheme !== 'calagopus') {
+      if (folder.folder.scheme !== 'ferox') {
         continue;
       }
 

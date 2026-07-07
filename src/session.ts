@@ -2,8 +2,8 @@ import * as vscode from 'vscode';
 import { ApiError, PanelClient } from './api/client.ts';
 import { log } from './log.ts';
 
-const ORIGINS_KEY = 'calagopus.origins';
-const API_KEY_PREFIX = 'calagopus.apiKey:';
+const ORIGINS_KEY = 'ferox.origins';
+const API_KEY_PREFIX = 'ferox.apiKey:';
 
 export class Session {
   private readonly clients = new Map<string, PanelClient>();
@@ -41,7 +41,7 @@ export class Session {
 
     const client = await this.promptSignIn(target);
     if (!client) {
-      throw new Error('Not signed in to a Calagopus panel.');
+      throw new Error('Not signed in to a Ferox panel.');
     }
     return client;
   }
@@ -80,8 +80,8 @@ export class Session {
 
   async promptSignIn(presetOrigin?: string | null): Promise<PanelClient | null> {
     const origin = await vscode.window.showInputBox({
-      title: 'Calagopus: Panel URL',
-      prompt: 'The URL of your Calagopus panel',
+      title: 'Ferox: Panel URL',
+      prompt: 'The URL of your Ferox panel',
       value: presetOrigin ?? 'https://',
       ignoreFocusOut: true,
       validateInput: (value) => {
@@ -98,7 +98,7 @@ export class Session {
     }
 
     const apiKey = await vscode.window.showInputBox({
-      title: 'Calagopus: API Key',
+      title: 'Ferox: API Key',
       prompt: 'A client API key (Account Settings -> API Keys)',
       password: true,
       ignoreFocusOut: true,
@@ -119,7 +119,7 @@ export class Session {
     this.ephemeral.delete(client.origin);
     this.didChangeEmitter.fire();
 
-    vscode.window.showInformationMessage(`Calagopus: signed in to ${client.origin}.`);
+    vscode.window.showInformationMessage(`Ferox: signed in to ${client.origin}.`);
     return client;
   }
 
@@ -148,7 +148,7 @@ export class Session {
     this.ephemeral.delete(client.origin);
     this.didChangeEmitter.fire();
 
-    vscode.window.showInformationMessage(`Calagopus: signed in to ${client.origin}.`);
+    vscode.window.showInformationMessage(`Ferox: signed in to ${client.origin}.`);
     return client;
   }
 
@@ -158,9 +158,9 @@ export class Session {
       return true;
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        vscode.window.showErrorMessage('Calagopus: the API key was rejected by the panel.');
+        vscode.window.showErrorMessage('Ferox: the API key was rejected by the panel.');
       } else {
-        vscode.window.showErrorMessage(`Calagopus: could not reach the panel (${err}).`);
+        vscode.window.showErrorMessage(`Ferox: could not reach the panel (${err}).`);
       }
       return false;
     }
@@ -186,7 +186,7 @@ export class Session {
     log.warn(`re-authentication required for ${origin}`);
 
     const apiKey = await vscode.window.showInputBox({
-      title: 'Calagopus: API Key',
+      title: 'Ferox: API Key',
       prompt: `Authentication failed for ${origin}. Enter a new client API key.`,
       password: true,
       ignoreFocusOut: true,

@@ -34,7 +34,7 @@ async function pickPanel(session: Session): Promise<PanelClient | null> {
 
   const ADD = '$(add) Sign in to another panel...';
   const picked = await vscode.window.showQuickPick([...origins, ADD], {
-    title: 'Calagopus: select a panel',
+    title: 'Ferox: select a panel',
   });
   if (!picked) {
     return null;
@@ -49,7 +49,7 @@ interface ServerPick extends vscode.QuickPickItem {
 function searchServer(client: PanelClient): Promise<Server | null> {
   return new Promise((resolve) => {
     const qp = vscode.window.createQuickPick<ServerPick>();
-    qp.title = `Calagopus: select a server (${client.origin})`;
+    qp.title = `Ferox: select a server (${client.origin})`;
     qp.placeholder = 'Search servers by name...';
     qp.matchOnDescription = true;
     qp.matchOnDetail = true;
@@ -108,7 +108,7 @@ function searchServer(client: PanelClient): Promise<Server | null> {
 
 export function mountedServers(): MountedServer[] {
   return (vscode.workspace.workspaceFolders ?? [])
-    .filter((folder) => folder.uri.scheme === 'calagopus')
+    .filter((folder) => folder.uri.scheme === 'ferox')
     .map((folder) => {
       const { origin, server } = decodeAuthority(folder.uri.authority);
       return { origin, uuid: server, name: folder.name || shortId(server) };
@@ -134,7 +134,7 @@ export async function pickMountedServer(session: Session): Promise<MountedServer
       detail: server.origin,
       server,
     })),
-    { title: 'Calagopus: select a mounted server', matchOnDescription: true, matchOnDetail: true },
+    { title: 'Ferox: select a mounted server', matchOnDescription: true, matchOnDetail: true },
   );
   return picked?.server ?? null;
 }
@@ -178,7 +178,7 @@ export async function openServerFolder(server: MountedServer): Promise<void> {
 
   log.error(`mount ${uri.toString()}: updateWorkspaceFolders returned false`);
   vscode.window.showErrorMessage(
-    `Calagopus: could not add ${server.name} to the workspace. Check the Calagopus output channel for details.`,
+    `Ferox: could not add ${server.name} to the workspace. Check the Ferox output channel for details.`,
   );
 }
 

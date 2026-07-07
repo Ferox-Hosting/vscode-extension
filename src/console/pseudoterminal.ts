@@ -5,7 +5,7 @@ import type { Session } from '../session.ts';
 import type { SettingsCache } from '../settings.ts';
 import { ConsoleSocket } from './websocket.ts';
 
-const DEFAULT_PRELUDE = 'container@calagopus~';
+const DEFAULT_PRELUDE = 'container@ferox~';
 
 const STATE_LABELS: Record<string, string> = {
   unknown: 'Unknown',

@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import { ConsolePseudoterminal, createConsoleTerminal } from './console/pseudoterminal.ts';
-import { CalagopusFileSystem } from './fs/fileSystemProvider.ts';
+import { FeroxFileSystem } from './fs/fileSystemProvider.ts';
 import { log } from './log.ts';
-import { CalagopusFileSearchProvider, CalagopusTextSearchProvider } from './search/searchProvider.ts';
+import { FeroxFileSearchProvider, FeroxTextSearchProvider } from './search/searchProvider.ts';
+import { ServersViewProvider, type ServerNode } from './serversView.ts';
 import {
   type MountedServer,
   mountedServers,
@@ -15,7 +16,7 @@ import { Session } from './session.ts';
 import { SettingsCache } from './settings.ts';
 import { ServerStatusBar } from './statusBar.ts';
 import {
-  CalagopusUriHandler,
+  FeroxUriHandler,
   openFile,
   PENDING_CONSOLE_KEY,
   PENDING_EXPLORER_KEY,
@@ -32,6 +33,18 @@ export function activate(context: vscode.ExtensionContext): void {
   const session = new Session(context.secrets);
   const settings = new SettingsCache(session);
   const statusBar = new ServerStatusBar(session);
+  const serversView = new ServersViewProvider(session);
+
+  // Resolve the server a view command should act on. Invoked from the tree it
+  // arrives as a ServerNode; invoked from the palette/title it is undefined, so
+  // fall back to the quick-pick.
+  const resolveServer = async (node?: ServerNode): Promise<MountedServer | null> => {
+    if (node) {
+      return { origin: node.origin, uuid: node.server.uuid, name: node.server.name };
+    }
+    const picked = await pickServer(session);
+    return picked ? { origin: picked.origin, uuid: picked.server.uuid, name: picked.server.name } : null;
+  };
 
   const openConsoleFor = (server: MountedServer): vscode.Terminal => {
     const { terminal } = createConsoleTerminal(session, settings, server.origin, server.uuid, server.name);
@@ -52,25 +65,33 @@ export function activate(context: vscode.ExtensionContext): void {
     log,
     statusBar,
 
-    vscode.workspace.registerFileSystemProvider('calagopus', new CalagopusFileSystem(session, settings), {
+    vscode.workspace.registerFileSystemProvider('ferox', new FeroxFileSystem(session), {
       isCaseSensitive: true,
     }),
 
-    vscode.window.registerUriHandler(new CalagopusUriHandler(session, context.globalState, openConsoleFor)),
+    vscode.window.registerUriHandler(new FeroxUriHandler(session, context.globalState, openConsoleFor)),
   );
 
-  try {
-    context.subscriptions.push(
-      vscode.workspace.registerTextSearchProvider2('calagopus', new CalagopusTextSearchProvider(session)),
-      vscode.workspace.registerFileSearchProvider2('calagopus', new CalagopusFileSearchProvider(session)),
-    );
-    log.info('search providers registered (proposed API available)');
-  } catch (err) {
-    log.warn(`search providers unavailable (proposed API not enabled): ${err}`);
+  // Search providers walk the entire remote tree, which generates a large burst
+  // of panel API requests and can trip the panel's per-user rate limit. They are
+  // opt-in (off by default) so a plain mount stays cheap; enable via the
+  // `ferox.enableSearchProviders` setting.
+  if (vscode.workspace.getConfiguration('ferox').get<boolean>('enableSearchProviders', false)) {
+    try {
+      context.subscriptions.push(
+        vscode.workspace.registerTextSearchProvider2('ferox', new FeroxTextSearchProvider(session)),
+        vscode.workspace.registerFileSearchProvider2('ferox', new FeroxFileSearchProvider(session)),
+      );
+      log.info('search providers registered (proposed API available)');
+    } catch (err) {
+      log.warn(`search providers unavailable (proposed API not enabled): ${err}`);
+    }
+  } else {
+    log.info('search providers disabled (ferox.enableSearchProviders is false)');
   }
 
   context.subscriptions.push(
-    vscode.window.registerTerminalProfileProvider('calagopus.console', {
+    vscode.window.registerTerminalProfileProvider('ferox.console', {
       async provideTerminalProfile() {
         const server = await pickMountedServer(session);
         if (!server) {
@@ -88,12 +109,12 @@ export function activate(context: vscode.ExtensionContext): void {
       },
     }),
 
-    vscode.commands.registerCommand('calagopus.signIn', () => session.promptSignIn()),
+    vscode.commands.registerCommand('ferox.signIn', () => session.promptSignIn()),
 
-    vscode.commands.registerCommand('calagopus.signOut', async () => {
+    vscode.commands.registerCommand('ferox.signOut', async () => {
       const origins = await session.origins();
       if (origins.length === 0) {
-        vscode.window.showInformationMessage('Calagopus: not signed in.');
+        vscode.window.showInformationMessage('Ferox: not signed in.');
         return;
       }
 
@@ -102,7 +123,7 @@ export function activate(context: vscode.ExtensionContext): void {
         origins.length === 1
           ? origins[0]
           : await vscode.window.showQuickPick([...origins, ALL], {
-              title: 'Calagopus: sign out of which panel?',
+              title: 'Ferox: sign out of which panel?',
             });
       if (!picked) {
         return;
@@ -110,11 +131,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
       await session.signOut(picked === ALL ? undefined : picked);
       vscode.window.showInformationMessage(
-        picked === ALL ? 'Calagopus: signed out of all panels.' : `Calagopus: signed out of ${picked}.`,
+        picked === ALL ? 'Ferox: signed out of all panels.' : `Ferox: signed out of ${picked}.`,
       );
     }),
 
-    vscode.commands.registerCommand('calagopus.openServer', async () => {
+    vscode.commands.registerCommand('ferox.openServer', async () => {
       const picked = await pickServer(session);
       if (picked) {
         const server = { origin: picked.origin, uuid: picked.server.uuid, name: picked.server.name };
@@ -123,14 +144,59 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }),
 
-    vscode.commands.registerCommand('calagopus.openConsole', () => openConsole()),
+    vscode.commands.registerCommand('ferox.openConsole', () => openConsole()),
 
-    vscode.commands.registerCommand('calagopus.powerAction', () => statusBar.showPowerActions()),
+    vscode.commands.registerCommand('ferox.powerAction', () => statusBar.showPowerActions()),
   );
+
+  context.subscriptions.push(
+    vscode.window.createTreeView('ferox.servers', { treeDataProvider: serversView }),
+
+    vscode.commands.registerCommand('ferox.refreshServers', () => serversView.refresh()),
+
+    vscode.commands.registerCommand('ferox.serverOpenFiles', async (node?: ServerNode) => {
+      const server = await resolveServer(node);
+      if (!server) {
+        return;
+      }
+      statusBar.pin(server.origin, server.uuid, server.name);
+      await openServerFolder(server);
+    }),
+
+    vscode.commands.registerCommand('ferox.serverOpenConsole', async (node?: ServerNode) => {
+      const server = await resolveServer(node);
+      if (server) {
+        openConsoleFor(server);
+      }
+    }),
+
+    vscode.commands.registerCommand('ferox.serverPower', async (node?: ServerNode) => {
+      const server = await resolveServer(node);
+      if (!server) {
+        return;
+      }
+      statusBar.pin(server.origin, server.uuid, server.name);
+      await statusBar.showPowerActions();
+    }),
+  );
+
+  // Drive the view's welcome/actions off sign-in state, and repopulate the
+  // server list whenever the session changes (sign in/out, key refresh).
+  const syncSignedIn = async () => {
+    const origins = await session.origins();
+    await vscode.commands.executeCommand('setContext', 'ferox.signedIn', origins.length > 0);
+  };
+  context.subscriptions.push(
+    session.onDidChange(() => {
+      void syncSignedIn();
+      serversView.refresh();
+    }),
+  );
+  void syncSignedIn();
 
   const restored = workspaceServers()[0];
   if (restored) {
-    log.info(`restored calagopus workspace for server ${restored.server} on ${restored.origin}`);
+    log.info(`restored ferox workspace for server ${restored.server} on ${restored.origin}`);
   }
 
   void (async () => {
@@ -160,7 +226,7 @@ async function resumePendingFile(context: vscode.ExtensionContext): Promise<void
 
   const uri = vscode.Uri.parse(stored);
   const mounted = (vscode.workspace.workspaceFolders ?? []).some(
-    (folder) => folder.uri.scheme === 'calagopus' && folder.uri.authority === uri.authority,
+    (folder) => folder.uri.scheme === 'ferox' && folder.uri.authority === uri.authority,
   );
   if (!mounted) {
     log.warn(`pending file ${stored}: owning server is not mounted; skipping`);

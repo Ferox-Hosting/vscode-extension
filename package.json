@@ -1,14 +1,14 @@
 {
-  "name": "calagopus",
+  "name": "ferox",
   "icon": "icon.png",
-  "displayName": "Calagopus",
-  "description": "Browse and edit Calagopus server files and access the server console directly from VS Code.",
+  "displayName": "Ferox Hosting",
+  "description": "Browse and edit Ferox Hosting server files and access the server console directly from VS Code.",
   "version": "1.0.0",
-  "publisher": "calagopus",
+  "publisher": "ferox",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/calagopus/vscode-extension.git"
+    "url": "https://github.com/Ferox-Hosting/vscode-extension.git"
   },
   "engines": {
     "vscode": "^1.120.0"
@@ -27,46 +27,152 @@
     }
   },
   "activationEvents": [
-    "onFileSystem:calagopus",
+    "onFileSystem:ferox",
+    "onView:ferox.servers",
     "onUri"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "calagopus.signIn",
+        "command": "ferox.signIn",
         "title": "Sign In",
-        "category": "Calagopus"
+        "category": "Ferox",
+        "icon": "$(add)"
       },
       {
-        "command": "calagopus.signOut",
+        "command": "ferox.signOut",
         "title": "Sign Out",
-        "category": "Calagopus"
+        "category": "Ferox"
       },
       {
-        "command": "calagopus.openServer",
+        "command": "ferox.openServer",
         "title": "Open Server Files",
-        "category": "Calagopus"
+        "category": "Ferox"
       },
       {
-        "command": "calagopus.openConsole",
+        "command": "ferox.openConsole",
         "title": "Open Server Console",
-        "category": "Calagopus"
+        "category": "Ferox"
       },
       {
-        "command": "calagopus.powerAction",
+        "command": "ferox.powerAction",
         "title": "Server Power Action",
-        "category": "Calagopus"
+        "category": "Ferox"
+      },
+      {
+        "command": "ferox.refreshServers",
+        "title": "Refresh",
+        "category": "Ferox",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ferox.serverOpenFiles",
+        "title": "Open Files",
+        "category": "Ferox",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "ferox.serverOpenConsole",
+        "title": "Open Console",
+        "category": "Ferox",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "ferox.serverPower",
+        "title": "Power Action",
+        "category": "Ferox",
+        "icon": "$(pulse)"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ferox",
+          "title": "Ferox",
+          "icon": "media/server.svg"
+        }
+      ]
+    },
+    "views": {
+      "ferox": [
+        {
+          "id": "ferox.servers",
+          "name": "Servers",
+          "icon": "media/server.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "ferox.servers",
+        "contents": "You are not signed in to a Ferox panel.\n[Sign In](command:ferox.signIn)",
+        "when": "!ferox.signedIn"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "ferox.serverOpenFiles",
+          "when": "false"
+        },
+        {
+          "command": "ferox.serverOpenConsole",
+          "when": "false"
+        },
+        {
+          "command": "ferox.serverPower",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "ferox.signIn",
+          "when": "view == ferox.servers",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ferox.refreshServers",
+          "when": "view == ferox.servers",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ferox.serverOpenFiles",
+          "when": "view == ferox.servers && viewItem == feroxServer",
+          "group": "inline@1"
+        },
+        {
+          "command": "ferox.serverOpenConsole",
+          "when": "view == ferox.servers && viewItem == feroxServer",
+          "group": "inline@2"
+        },
+        {
+          "command": "ferox.serverPower",
+          "when": "view == ferox.servers && viewItem == feroxServer",
+          "group": "inline@3"
+        }
+      ]
+    },
     "terminal": {
       "profiles": [
         {
-          "id": "calagopus.console",
-          "title": "Calagopus Console",
+          "id": "ferox.console",
+          "title": "Ferox Console",
           "icon": "server-environment"
         }
       ]
+    },
+    "configuration": {
+      "title": "Ferox",
+      "properties": {
+        "ferox.enableSearchProviders": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Register the workspace text/file search providers for `ferox://` folders. These walk the whole remote tree, generating many panel API requests, and can hit the panel's per-user rate limit on large servers. Leave disabled unless you need in-editor search."
+        }
+      }
     }
   },
   "scripts": {
@@ -74,8 +180,8 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "vscode:prepublish": "pnpm typecheck && pnpm compile -- --production",
-    "package": "vsce package --no-dependencies --out dist/calagopus.vsix",
-    "code:install": "code --install-extension dist/calagopus.vsix",
+    "package": "vsce package --no-dependencies --out dist/ferox.vsix",
+    "code:install": "code --install-extension dist/ferox.vsix",
     "code:install-dev": "pnpm compile && pnpm package && pnpm code:install",
     "biome:validate": "biome format --css-parse-tailwind-directives=true && biome lint --css-parse-tailwind-directives=true && biome check",
     "biome:fix": "biome format --write --css-parse-tailwind-directives=true && biome lint --write --css-parse-tailwind-directives=true && biome check --write",

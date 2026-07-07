@@ -93,10 +93,10 @@ export class ServerStatusBar implements vscode.Disposable {
 
   constructor(private readonly session: Session) {
     this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
-    this.item.command = 'calagopus.statusBar.switch';
+    this.item.command = 'ferox.statusBar.switch';
 
     this.disposables.push(
-      vscode.commands.registerCommand('calagopus.statusBar.switch', () => this.showSwitcher()),
+      vscode.commands.registerCommand('ferox.statusBar.switch', () => this.showSwitcher()),
       vscode.window.onDidChangeActiveTextEditor(() => this.render()),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.syncServers()),
       this.session.onDidChange(() => this.refreshNames()),
@@ -123,7 +123,7 @@ export class ServerStatusBar implements vscode.Disposable {
   private syncServers(): void {
     const wanted = new Map<string, { origin: string; uuid: string }>();
     for (const folder of vscode.workspace.workspaceFolders ?? []) {
-      if (folder.uri.scheme === 'calagopus') {
+      if (folder.uri.scheme === 'ferox') {
         const { origin, server } = decodeAuthority(folder.uri.authority);
         wanted.set(entryKey(origin, server), { origin, uuid: server });
       }
@@ -203,7 +203,7 @@ export class ServerStatusBar implements vscode.Disposable {
 
   private focusedKey(): string | null {
     const uri = vscode.window.activeTextEditor?.document.uri;
-    if (uri?.scheme === 'calagopus') {
+    if (uri?.scheme === 'ferox') {
       const { origin, server } = decodeAuthority(uri.authority);
       const key = entryKey(origin, server);
       if (this.servers.has(key)) {
@@ -274,13 +274,13 @@ export class ServerStatusBar implements vscode.Disposable {
 
   private showSwitcher(): void {
     if (this.servers.size === 0) {
-      vscode.window.showInformationMessage('Calagopus: no active server.');
+      vscode.window.showInformationMessage('Ferox: no active server.');
       return;
     }
 
     const focused = this.focusedKey();
     const qp = vscode.window.createQuickPick<ServerPick>();
-    qp.title = 'Calagopus servers';
+    qp.title = 'Ferox servers';
     qp.placeholder = 'Select a server to focus - use the buttons for power actions';
     qp.items = [...this.servers.values()].map((entry) => ({
       label: `${stateIcon(entry.state)} ${this.displayName(entry)}`,
@@ -311,7 +311,7 @@ export class ServerStatusBar implements vscode.Disposable {
     const key = this.focusedKey();
     const entry = key ? this.servers.get(key) : null;
     if (!entry) {
-      vscode.window.showInformationMessage('Calagopus: no active server.');
+      vscode.window.showInformationMessage('Ferox: no active server.');
       return;
     }
 
@@ -340,7 +340,7 @@ export class ServerStatusBar implements vscode.Disposable {
       const client = await this.session.client(origin);
       await client.sendPowerAction(uuid, action);
     } catch (err) {
-      vscode.window.showErrorMessage(`Calagopus: power action failed (${err}).`);
+      vscode.window.showErrorMessage(`Ferox: power action failed (${err}).`);
     }
   }
 

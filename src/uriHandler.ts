@@ -7,9 +7,9 @@ import { log } from './log.ts';
 import { type MountedServer, mountWillReload, openServerFolder, shortId } from './servers.ts';
 import type { Session } from './session.ts';
 
-export const PENDING_CONSOLE_KEY = 'calagopus.pendingConsole';
-export const PENDING_EXPLORER_KEY = 'calagopus.pendingExplorer';
-export const PENDING_FILE_KEY = 'calagopus.pendingFile';
+export const PENDING_CONSOLE_KEY = 'ferox.pendingConsole';
+export const PENDING_EXPLORER_KEY = 'ferox.pendingExplorer';
+export const PENDING_FILE_KEY = 'ferox.pendingFile';
 
 const CREATE_KEY_NAME = 'VS Code';
 const CREATE_KEY_ADMIN_PERMISSIONS = ['servers.read'];
@@ -31,7 +31,7 @@ const CREATE_KEY_SERVER_PERMISSIONS = [
 
 function callbackPage(message: string, autoClose = false): string {
   const script = autoClose ? '<script>setTimeout(() => window.close(), 3000);</script>' : '';
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Calagopus</title></head><body style="font-family: system-ui, sans-serif; text-align: center; padding: 4rem;"><h2>Calagopus</h2><p>${message}</p>${script}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Ferox</title></head><body style="font-family: system-ui, sans-serif; text-align: center; padding: 4rem;"><h2>Ferox</h2><p>${message}</p>${script}</body></html>`;
 }
 
 const CALLBACK_OK_PAGE = callbackPage('Signed in. This tab will close automatically.', true);
@@ -54,7 +54,7 @@ export async function openFile(uri: vscode.Uri): Promise<void> {
   }
 }
 
-export class CalagopusUriHandler implements vscode.UriHandler {
+export class FeroxUriHandler implements vscode.UriHandler {
   constructor(
     private readonly session: Session,
     private readonly globalState: vscode.Memento,
@@ -78,7 +78,7 @@ export class CalagopusUriHandler implements vscode.UriHandler {
 
     if (!origin || !server) {
       log.error(`uri handler: malformed open link: ${uri.toString()}`);
-      vscode.window.showErrorMessage('Calagopus: malformed open link.');
+      vscode.window.showErrorMessage('Ferox: malformed open link.');
       return;
     }
 
@@ -193,7 +193,7 @@ export class CalagopusUriHandler implements vscode.UriHandler {
     const manual = vscode.window.withProgress<string | undefined>(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `Calagopus: waiting for authentication from ${origin}…`,
+        title: `Ferox: waiting for authentication from ${origin}…`,
         cancellable: true,
       },
       (_progress, progressToken) => {
@@ -201,7 +201,7 @@ export class CalagopusUriHandler implements vscode.UriHandler {
         return Promise.resolve(
           vscode.window.showInputBox(
             {
-              title: 'Calagopus: finish signing in',
+              title: 'Ferox: finish signing in',
               prompt: 'Approve in your browser to finish automatically, or paste an API key here.',
               password: true,
               ignoreFocusOut: true,

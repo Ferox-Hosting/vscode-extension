@@ -1,19 +1,18 @@
 import * as vscode from 'vscode';
-import { ApiError, type PanelClient } from '../api/client.ts';
+import { ApiError } from '../api/client.ts';
 import type { DirectoryEntry } from '../api/types.ts';
 import { log } from '../log.ts';
 import type { Session } from '../session.ts';
-import type { SettingsCache } from '../settings.ts';
 
 export interface ServerRef {
   origin: string;
   server: string;
 }
 
-// calagopus://<hex(origin)>.<server-uuid>/<path...>
+// ferox://<hex(origin)>.<server-uuid>/<path...>
 export function serverUri(origin: string, server: string, path = '/'): vscode.Uri {
   const authority = `${encodeOrigin(origin)}.${server.toLowerCase()}`;
-  return vscode.Uri.from({ scheme: 'calagopus', authority, path });
+  return vscode.Uri.from({ scheme: 'ferox', authority, path });
 }
 
 export function refOf(uri: vscode.Uri): ServerRef {
@@ -38,12 +37,7 @@ export function decodeAuthority(authority: string): ServerRef {
   return { origin, server: authority.slice(dot + 1) };
 }
 
-function joinPath(directory: string, name: string): string {
-  return directory === '/' ? `/${name}` : `${directory}/${name}`;
-}
-
 const CACHE_TTL_MS = 2_500;
-const MAX_INLINE_WRITE_BYTES = 1024 * 1024;
 
 interface CachedListing {
   at: number;
@@ -82,16 +76,13 @@ function translateError(err: unknown, uri: vscode.Uri): Error {
   return err instanceof Error ? err : new Error(String(err));
 }
 
-export class CalagopusFileSystem implements vscode.FileSystemProvider {
+export class FeroxFileSystem implements vscode.FileSystemProvider {
   private readonly cache = new Map<string, CachedListing>();
 
   private readonly didChangeEmitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
   readonly onDidChangeFile = this.didChangeEmitter.event;
 
-  constructor(
-    private readonly session: Session,
-    private readonly settings: SettingsCache,
-  ) {}
+  constructor(private readonly session: Session) {}
 
   watch(): vscode.Disposable {
     return new vscode.Disposable(() => null);
@@ -115,16 +106,6 @@ export class CalagopusFileSystem implements vscode.FileSystemProvider {
     return entries;
   }
 
-  private async lookup(uri: vscode.Uri): Promise<DirectoryEntry | null> {
-    const { parent, name } = parentOf(uri.path);
-    try {
-      const entries = await this.listCached(refOf(uri), parent);
-      return entries.find((e) => e.name === name) ?? null;
-    } catch {
-      return null;
-    }
-  }
-
   private invalidate(ref: ServerRef, directory: string) {
     this.cache.delete(this.cacheKey(ref, directory));
   }
@@ -142,10 +123,13 @@ export class CalagopusFileSystem implements vscode.FileSystemProvider {
         throw vscode.FileSystemError.FileNotFound(uri);
       }
 
+      const mtime = entry.modified ? Date.parse(entry.modified) || 0 : 0;
       return {
         type: toFileType(entry),
-        ctime: Date.parse(entry.created) || 0,
-        mtime: Date.parse(entry.modified) || 0,
+        // The legacy daemon does not report a creation time separately, so we
+        // fall back to the modification time for ctime.
+        ctime: mtime,
+        mtime,
         size: entry.size,
       };
     } catch (err) {
@@ -166,15 +150,8 @@ export class CalagopusFileSystem implements vscode.FileSystemProvider {
     log.trace(`fs read ${uri.toString()}`);
 
     const { origin, server } = refOf(uri);
-    const [entry, settings] = await Promise.all([this.lookup(uri), this.settings.tryGet(origin)]);
-    const tooBigToView = !!(entry && settings && entry.size > settings.server.max_file_manager_view_size);
-
     try {
       const client = await this.session.client(origin);
-      if (tooBigToView) {
-        const { parent, name } = parentOf(uri.path);
-        return await client.downloadFile(server, parent, name);
-      }
       return await client.readFile(server, uri.path);
     } catch (err) {
       log.error(`fs read ${uri.toString()} failed: ${err}`);
@@ -207,12 +184,7 @@ export class CalagopusFileSystem implements vscode.FileSystemProvider {
 
     try {
       const client = await this.session.client(ref.origin);
-
-      if (content.byteLength > MAX_INLINE_WRITE_BYTES) {
-        await client.uploadFile(ref.server, parent, name, content);
-      } else {
-        await client.writeFile(ref.server, uri.path, content);
-      }
+      await client.writeFile(ref.server, uri.path, content);
     } catch (err) {
       log.error(`fs write ${uri.toString()} failed: ${err}`);
       throw translateError(err, uri);
@@ -292,117 +264,8 @@ export class CalagopusFileSystem implements vscode.FileSystemProvider {
     ]);
   }
 
-  async copy(source: vscode.Uri, destination: vscode.Uri, options: { overwrite: boolean }): Promise<void> {
-    if (source.scheme !== 'calagopus' || destination.scheme !== 'calagopus') {
-      throw vscode.FileSystemError.Unavailable('Only calagopus:// URIs are supported.');
-    }
-
-    const srcRef = refOf(source);
-    const destRef = refOf(destination);
-    const { parent: srcParent, name: srcName } = parentOf(source.path);
-    const { parent: destParent, name: destName } = parentOf(destination.path);
-
-    let destExists = false;
-    try {
-      const entries = await this.listCached(destRef, destParent);
-      destExists = entries.some((e) => e.name === destName);
-    } catch {
-      // destination parent unknown
-    }
-    if (destExists && !options.overwrite) {
-      throw vscode.FileSystemError.FileExists(destination);
-    }
-
-    try {
-      const srcClient = await this.session.client(srcRef.origin);
-      const destClient = destRef.origin === srcRef.origin ? srcClient : await this.session.client(destRef.origin);
-
-      if (destExists) {
-        await destClient.delete(destRef.server, [destination.path]);
-      }
-
-      if (srcRef.origin !== destRef.origin) {
-        const entry = await this.lookup(source);
-        await this.pipeAcrossOrigins(
-          srcClient,
-          srcRef.server,
-          destClient,
-          destRef.server,
-          source.path,
-          destination.path,
-          entry?.directory ?? false,
-        );
-      } else if (srcRef.server === destRef.server) {
-        if (srcParent === destParent) {
-          await srcClient.copy(srcRef.server, source.path, destName);
-        } else {
-          await this.copyViaTemp(srcClient, srcRef.server, source.path, srcParent, destination.path);
-        }
-      } else {
-        await srcClient.copyRemote(srcRef.server, srcParent, [srcName], destParent, destRef.server);
-        if (srcName !== destName) {
-          await destClient.rename(destRef.server, joinPath(destParent, srcName), destination.path);
-        }
-      }
-    } catch (err) {
-      log.error(`fs copy ${source.toString()} -> ${destination.toString()} failed: ${err}`);
-      throw translateError(err, destination);
-    }
-
-    this.invalidate(srcRef, srcParent);
-    this.invalidate(destRef, destParent);
-    this.didChangeEmitter.fire([{ type: vscode.FileChangeType.Created, uri: destination }]);
-  }
-
-  private async pipeAcrossOrigins(
-    srcClient: PanelClient,
-    srcServer: string,
-    destClient: PanelClient,
-    destServer: string,
-    srcPath: string,
-    destPath: string,
-    isDirectory: boolean,
-  ): Promise<void> {
-    if (!isDirectory) {
-      const src = parentOf(srcPath);
-      const dest = parentOf(destPath);
-      const bytes = await srcClient.downloadFile(srcServer, src.parent, src.name);
-      await destClient.uploadFile(destServer, dest.parent, dest.name, bytes);
-      return;
-    }
-
-    const dest = parentOf(destPath);
-    await destClient.createDirectory(destServer, dest.parent, dest.name);
-
-    const entries = await srcClient.listDirectory(srcServer, srcPath);
-    for (const child of entries) {
-      await this.pipeAcrossOrigins(
-        srcClient,
-        srcServer,
-        destClient,
-        destServer,
-        joinPath(srcPath, child.name),
-        joinPath(destPath, child.name),
-        child.directory,
-      );
-    }
-  }
-
-  private async copyViaTemp(
-    client: PanelClient,
-    server: string,
-    sourcePath: string,
-    srcParent: string,
-    destPath: string,
-  ): Promise<void> {
-    const tempName = `.calagopus-copy-${Date.now()}`;
-    const tempPath = joinPath(srcParent, tempName);
-    await client.copy(server, sourcePath, tempName);
-    try {
-      await client.rename(server, tempPath, destPath);
-    } catch (err) {
-      await client.delete(server, [tempPath]).catch(() => undefined);
-      throw err;
-    }
-  }
+  // Copy is intentionally not implemented for Phase 1. Without a copy method,
+  // VS Code emulates copy operations via read + write, which is sufficient for
+  // same-server copies against the legacy daemon. A native copy endpoint can be
+  // added later (see VSCODE_EXTENSION_PLAN.md Phase 4).
 }

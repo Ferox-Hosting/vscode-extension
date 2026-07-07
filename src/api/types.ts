@@ -1,31 +1,20 @@
-export interface Pagination<T> {
-  total: number;
-  per_page: number;
-  page: number;
-  data: T[];
-}
-
+// Directory entry as returned by our panel's client file API (see
+// FileRepository::getDirectoryRaw). The legacy Node daemon does not expose the
+// richer Wings fields (mode_bits, size_physical, inner_editable, …), so we only
+// carry what the FileSystemProvider actually needs.
 export interface DirectoryEntry {
   name: string;
-  mode: string;
-  mode_bits: string;
-  size: number;
-  size_physical: number;
-  editable: boolean;
-  inner_editable: boolean;
   directory: boolean;
   file: boolean;
   symlink: boolean;
+  size: number;
   mime: string;
-  modified: string;
-  created: string;
+  modified: string | null;
 }
 
+// Our panel returns the whole directory in a single, unpaginated payload.
 export interface DirectoryListResponse {
-  is_filesystem_primary: boolean;
-  is_filesystem_writable: boolean;
-  is_filesystem_fast: boolean;
-  entries: Pagination<DirectoryEntry>;
+  entries: DirectoryEntry[];
 }
 
 export interface Server {
@@ -33,15 +22,37 @@ export interface Server {
   uuid_short: string;
   name: string;
   description: string | null;
-  status: 'installing' | 'install_failed' | 'restoring_backup' | null;
-  is_suspended: boolean;
-  is_owner: boolean;
-  permissions: string[];
-  node_name: string;
 }
 
-export interface ServerListResponse {
-  servers: Pagination<Server>;
+// Pterodactyl 0.7.x wraps every resource in a Fractal envelope. A single
+// resource is `{ object, attributes }`; a collection is `{ object: 'list',
+// data: [...], meta: { pagination } }`.
+export interface FractalItem<T> {
+  object: string;
+  attributes: T;
+}
+
+export interface FractalPagination {
+  total: number;
+  count: number;
+  per_page: number;
+  current_page: number;
+  total_pages: number;
+}
+
+export interface FractalList<T> {
+  object: 'list';
+  data: FractalItem<T>[];
+  meta?: { pagination?: FractalPagination };
+}
+
+// Raw attributes for a server as produced by the panel's client ServerTransformer.
+export interface ServerAttributes {
+  server_owner: boolean;
+  identifier: string;
+  uuid: string;
+  name: string;
+  description: string | null;
 }
 
 export interface WebsocketCredentials {

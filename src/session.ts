@@ -6,6 +6,10 @@ import { log } from './log.ts';
 const ORIGINS_KEY = 'ferox.origins';
 const API_KEY_PREFIX = 'ferox.apiKey:';
 
+// The panel the in-editor Sign In button targets. Signing into any other panel goes through
+// promptSignIn, which pre-fills this but lets the user type a different URL.
+export const DEFAULT_PANEL_ORIGIN = 'https://panel.ferox.host';
+
 export class Session {
   private readonly clients = new Map<string, PanelClient>();
   private readonly ephemeral = new Set<string>();
@@ -79,11 +83,25 @@ export class Session {
     return new PanelClient({ origin, apiKey }, (client) => this.reauth(client));
   }
 
+  // Sign in to a specific panel without prompting for its URL. Used by the in-editor Sign In
+  // button, which always targets DEFAULT_PANEL_ORIGIN.
+  async signIn(origin: string): Promise<PanelClient | null> {
+    // Approve in the browser (the panel mints a key and hands it back over a loopback callback).
+    // Pasting a key manually still works as a fallback during the wait — see authenticateViaBrowser.
+    const normalizedOrigin = new URL(origin).origin;
+    const key = await authenticateViaBrowser(normalizedOrigin, DEFAULT_CREATE_PATH);
+    if (!key) {
+      return null;
+    }
+
+    return this.signInWithKey(normalizedOrigin, key);
+  }
+
   async promptSignIn(presetOrigin?: string | null): Promise<PanelClient | null> {
     const origin = await vscode.window.showInputBox({
       title: 'Ferox: Panel URL',
       prompt: 'The URL of your Ferox panel',
-      value: presetOrigin ?? 'https://',
+      value: presetOrigin ?? 'https://panel.ferox.host',
       ignoreFocusOut: true,
       validateInput: (value) => {
         try {
@@ -98,15 +116,7 @@ export class Session {
       return null;
     }
 
-    // Approve in the browser (the panel mints a key and hands it back over a loopback callback).
-    // Pasting a key manually still works as a fallback during the wait — see authenticateViaBrowser.
-    const normalizedOrigin = new URL(origin).origin;
-    const key = await authenticateViaBrowser(normalizedOrigin, DEFAULT_CREATE_PATH);
-    if (!key) {
-      return null;
-    }
-
-    return this.signInWithKey(normalizedOrigin, key);
+    return this.signIn(origin);
   }
 
   async ephemeralClient(origin: string, apiKey: string): Promise<PanelClient | null> {

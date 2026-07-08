@@ -26,11 +26,22 @@ const CREATE_KEY_SERVER_PERMISSIONS = [
 ];
 
 function callbackPage(message: string, autoClose = false): string {
-  const script = autoClose ? '<script>setTimeout(() => window.close(), 3000);</script>' : '';
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Ferox</title></head><body style="font-family: system-ui, sans-serif; text-align: center; padding: 4rem;"><h2>Ferox</h2><p>${message}</p>${script}</body></html>`;
+  // Browsers only honour window.close() on tabs that were opened by script
+  // (window.open). The OAuth callback tab is a normal top-level navigation, so
+  // close() is silently ignored in most browsers. Attempt it anyway, and if the
+  // tab is still around a moment later, swap in a message the user can act on.
+  const script = autoClose
+    ? `<script>
+        window.close();
+        setTimeout(() => {
+          document.getElementById('msg').textContent = 'You can now close this tab and return to your editor.';
+        }, 500);
+      </script>`
+    : '';
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Ferox</title></head><body style="font-family: system-ui, sans-serif; text-align: center; padding: 4rem;"><h2>Ferox</h2><p id="msg">${message}</p>${script}</body></html>`;
 }
 
-const CALLBACK_OK_PAGE = callbackPage('Signed in. This tab will close automatically.', true);
+const CALLBACK_OK_PAGE = callbackPage('Signed in. Closing this tab…', true);
 const CALLBACK_BAD_PAGE = callbackPage('No API key was provided. Please return to your editor and try again.');
 
 export function normalizeFilePath(path: string): string {

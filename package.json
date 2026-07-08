@@ -2,8 +2,8 @@
   "name": "ferox",
   "icon": "icon.png",
   "displayName": "Ferox Hosting",
-  "description": "Browse and edit Ferox Hosting server files and access the server console directly from VS Code.",
-  "version": "1.0.3",
+  "description": "Browse and edit Ferox Hosting server files directly from VS Code.",
+  "version": "1.0.4",
   "publisher": "FeroxHosting",
   "license": "MIT",
   "repository": {
@@ -41,6 +41,11 @@
         "icon": "$(add)"
       },
       {
+        "command": "ferox.signInOther",
+        "title": "Sign In to Another Panel",
+        "category": "Ferox"
+      },
+      {
         "command": "ferox.signOut",
         "title": "Sign Out",
         "category": "Ferox"
@@ -48,11 +53,6 @@
       {
         "command": "ferox.openServer",
         "title": "Open Server Files",
-        "category": "Ferox"
-      },
-      {
-        "command": "ferox.openConsole",
-        "title": "Open Server Console",
         "category": "Ferox"
       },
       {
@@ -71,12 +71,6 @@
         "title": "Open Files",
         "category": "Ferox",
         "icon": "$(folder-opened)"
-      },
-      {
-        "command": "ferox.serverOpenConsole",
-        "title": "Open Console",
-        "category": "Ferox",
-        "icon": "$(terminal)"
       },
       {
         "command": "ferox.serverPower",
@@ -117,7 +111,7 @@
           "when": "false"
         },
         {
-          "command": "ferox.serverOpenConsole",
+          "command": "ferox.powerAction",
           "when": "false"
         },
         {
@@ -142,15 +136,6 @@
           "command": "ferox.serverOpenFiles",
           "when": "view == ferox.servers && viewItem == feroxServer",
           "group": "inline@1"
-        }
-      ]
-    },
-    "terminal": {
-      "profiles": [
-        {
-          "id": "ferox.console",
-          "title": "Ferox Console",
-          "icon": "server-environment"
         }
       ]
     }

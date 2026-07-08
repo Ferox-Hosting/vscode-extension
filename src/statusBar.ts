@@ -42,6 +42,10 @@ const POWER_BUTTONS: PowerButton[] = POWER_ACTIONS.map(({ action, icon, label })
   tooltip: label,
 }));
 
+// Power actions are currently hidden from the UI. Flip this to re-expose the switcher's
+// per-server power buttons; the rest of the wiring is kept intact.
+const SHOW_POWER_ACTIONS = false;
+
 function stateIcon(state: PowerState | null): string {
   switch (state) {
     case 'running':
@@ -260,7 +264,7 @@ export class ServerStatusBar implements vscode.Disposable {
       md.appendMarkdown('_Waiting for live stats..._\n');
     }
 
-    md.appendMarkdown('\n$(list-selection) Click to switch servers or run power actions.');
+    md.appendMarkdown('\n$(list-selection) Click to switch servers.');
     return md;
   }
 
@@ -281,12 +285,12 @@ export class ServerStatusBar implements vscode.Disposable {
     const focused = this.focusedKey();
     const qp = vscode.window.createQuickPick<ServerPick>();
     qp.title = 'Ferox servers';
-    qp.placeholder = 'Select a server to focus - use the buttons for power actions';
+    qp.placeholder = 'Select a server to focus';
     qp.items = [...this.servers.values()].map((entry) => ({
       label: `${stateIcon(entry.state)} ${this.displayName(entry)}`,
       description: entry.state ?? 'unknown',
       detail: this.statsLine(entry),
-      buttons: POWER_BUTTONS,
+      buttons: SHOW_POWER_ACTIONS ? POWER_BUTTONS : [],
       origin: entry.origin,
       uuid: entry.uuid,
       name: this.displayName(entry),

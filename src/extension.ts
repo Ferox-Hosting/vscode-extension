@@ -1,18 +1,17 @@
 import * as vscode from 'vscode';
-import { ConsolePseudoterminal, createConsoleTerminal } from './console/pseudoterminal.ts';
+import { createConsoleTerminal } from './console/pseudoterminal.ts';
 import { FeroxFileSystem } from './fs/fileSystemProvider.ts';
 import { log } from './log.ts';
-import { ServersViewProvider, type ServerNode } from './serversView.ts';
 import {
   type MountedServer,
   mountedServers,
   mountWillReload,
   openServerFolder,
-  pickMountedServer,
   pickServer,
   workspaceServers,
 } from './servers.ts';
-import { Session } from './session.ts';
+import { type ServerNode, ServersViewProvider } from './serversView.ts';
+import { DEFAULT_PANEL_ORIGIN, Session } from './session.ts';
 import { SettingsCache } from './settings.ts';
 import { ServerStatusBar } from './statusBar.ts';
 import {
@@ -53,14 +52,6 @@ export function activate(context: vscode.ExtensionContext): void {
     return terminal;
   };
 
-  const openConsole = async () => {
-    const server = await pickMountedServer(session);
-    if (!server) {
-      return null;
-    }
-    return openConsoleFor(server);
-  };
-
   context.subscriptions.push(
     log,
     statusBar,
@@ -73,25 +64,9 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.window.registerTerminalProfileProvider('ferox.console', {
-      async provideTerminalProfile() {
-        const server = await pickMountedServer(session);
-        if (!server) {
-          throw new Error('No server selected.');
-        }
+    vscode.commands.registerCommand('ferox.signIn', () => session.signIn(DEFAULT_PANEL_ORIGIN)),
 
-        const pty = new ConsolePseudoterminal(session, settings, server.origin, server.uuid, server.name);
-        statusBar.pin(server.origin, server.uuid, server.name);
-
-        return new vscode.TerminalProfile({
-          name: `Console: ${server.name}`,
-          pty,
-          iconPath: new vscode.ThemeIcon('server-environment'),
-        });
-      },
-    }),
-
-    vscode.commands.registerCommand('ferox.signIn', () => session.promptSignIn()),
+    vscode.commands.registerCommand('ferox.signInOther', () => session.promptSignIn()),
 
     vscode.commands.registerCommand('ferox.signOut', async () => {
       const origins = await session.origins();
@@ -126,8 +101,6 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }),
 
-    vscode.commands.registerCommand('ferox.openConsole', () => openConsole()),
-
     vscode.commands.registerCommand('ferox.powerAction', () => statusBar.showPowerActions()),
   );
 
@@ -151,13 +124,6 @@ export function activate(context: vscode.ExtensionContext): void {
       await openServerFolder(server);
       if (!willReload) {
         await vscode.commands.executeCommand('workbench.view.explorer');
-      }
-    }),
-
-    vscode.commands.registerCommand('ferox.serverOpenConsole', async (node?: ServerNode) => {
-      const server = await resolveServer(node);
-      if (server) {
-        openConsoleFor(server);
       }
     }),
 

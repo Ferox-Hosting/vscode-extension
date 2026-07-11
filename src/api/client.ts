@@ -38,8 +38,14 @@ async function apiError(response: Response): Promise<ApiError> {
     const body = (await response.json()) as { error?: unknown; errors?: unknown[] };
     if (typeof body.error === 'string') {
       message = body.error;
-    } else if (Array.isArray(body.errors) && typeof body.errors[0] === 'string') {
-      message = body.errors[0];
+    } else if (Array.isArray(body.errors) && body.errors.length > 0) {
+      const first = body.errors[0];
+      if (typeof first === 'string') {
+        message = first;
+      } else if (first && typeof first === 'object' && typeof (first as { detail?: unknown }).detail === 'string') {
+        // Pterodactyl renders API errors in JSON:API format: { errors: [{ detail }] }.
+        message = (first as { detail: string }).detail;
+      }
     }
   } catch {
     // not json
@@ -135,8 +141,21 @@ export class PanelClient {
   }
 
   async readFile(server: string, file: string): Promise<Uint8Array> {
+    // The panel's file-contents endpoint transports the body inside a JSON
+    // string field, which can only hold valid UTF-8 and therefore silently
+    // corrupts (or fails on) binary files. Instead we ask the panel for a
+    // one-time raw-download URL and stream the file byte-for-byte from the
+    // daemon, which works for any file type or size.
     const params = new URLSearchParams({ file });
-    const response = await this.request(`/api/client/servers/${server}/files/contents?${params}`);
+    const { url } = await this.json<{ url: string }>(`/api/client/servers/${server}/files/download?${params}`);
+
+    // The download URL targets the daemon directly and is authenticated by the
+    // one-time token embedded in it, so it must be fetched without the panel
+    // Authorization header.
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new ApiError(response.status, `${response.status} ${response.statusText}`);
+    }
     return new Uint8Array(await response.arrayBuffer());
   }
 

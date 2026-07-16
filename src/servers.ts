@@ -66,8 +66,8 @@ function searchServer(client: PanelClient): Promise<Server | null> {
           return;
         }
         qp.items = servers.map((server) => ({
-          label: server.suspended ? `$(circle-slash) ${server.name}` : server.name,
-          description: server.suspended ? `${server.uuid_short} · suspended` : server.uuid_short,
+          label: server.name,
+          description: server.uuid_short,
           detail: server.description ?? undefined,
           server,
         }));
@@ -90,12 +90,7 @@ function searchServer(client: PanelClient): Promise<Server | null> {
       debounce = setTimeout(() => void load(value), 250);
     });
     qp.onDidAccept(() => {
-      const server = qp.selectedItems[0]?.server;
-      if (server?.suspended) {
-        void vscode.window.showWarningMessage(`Ferox: "${server.name}" is suspended and cannot be opened.`);
-        return;
-      }
-      resolve(server ?? null);
+      resolve(qp.selectedItems[0]?.server ?? null);
       qp.hide();
     });
     qp.onDidHide(() => {

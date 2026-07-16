@@ -45,17 +45,6 @@ export class ServersViewProvider implements vscode.TreeDataProvider<Node> {
 
     const item = new vscode.TreeItem(node.server.name, vscode.TreeItemCollapsibleState.None);
 
-    if (node.server.suspended) {
-      // A suspended server can't serve files or a console, so keep the row inert:
-      // no open-files click command, and a distinct contextValue so the inline
-      // action buttons (scoped to `feroxServer`) don't render.
-      item.description = `${node.server.uuid_short} · suspended`;
-      item.tooltip = 'This server is suspended and cannot be opened.';
-      item.iconPath = new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('disabledForeground'));
-      item.contextValue = 'feroxServerSuspended';
-      return item;
-    }
-
     item.description = node.server.uuid_short;
     item.tooltip = node.server.description ?? node.server.name;
     item.iconPath = new vscode.ThemeIcon('server-environment');

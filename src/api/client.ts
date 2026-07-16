@@ -114,13 +114,17 @@ export class PanelClient {
     // The 0.7.x client endpoint ignores a free-text search parameter, so any
     // filtering is left to the caller's quick-pick. We page through the Fractal
     // envelope until the reported page count is exhausted.
+    //
+    // Suspended servers can't serve files or a console, so we drop them here:
+    // they stay hidden from every listing surface (tree view and quick-pick)
+    // rather than showing up as inert, un-openable rows.
     const servers: Server[] = [];
     for (let page = 1; ; page++) {
       const params = new URLSearchParams({ page: `${page}` });
       if (search) params.set('search', search);
 
       const body = await this.json<FractalList<ServerAttributes>>(`/api/client/servers?${params}`);
-      servers.push(...body.data.map(toServer));
+      servers.push(...body.data.map(toServer).filter((server) => !server.suspended));
 
       const pagination = body.meta?.pagination;
       if (!pagination || pagination.total_pages <= page || body.data.length === 0) {

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { PanelClient } from './api/client.ts';
-import { authenticateViaBrowser, normalizeFilePath } from './auth.ts';
+import { authenticateViaBrowser, DEFAULT_CREATE_PATH, normalizeFilePath } from './auth.ts';
 import { serverUri } from './fs/fileSystemProvider.ts';
 import { log } from './log.ts';
 import { type MountedServer, mountWillReload, openServerFolder, shortId } from './servers.ts';
@@ -62,12 +62,12 @@ export class FeroxUriHandler implements vscode.UriHandler {
       }${fileParam ? ` (+file ${fileParam})` : ''}`,
     );
 
+    // The origin is fixed for these links, so never ask which panel to use — go straight to
+    // browser approval for the panel the link already implies.
     const client = apiKey
       ? await this.session.ephemeralClient(origin, apiKey)
       : ((await this.session.clientIfSignedIn(origin)) ??
-        (createPath
-          ? await this.redirectToCreateKey(origin, createPath, params)
-          : await this.session.promptSignIn(origin)));
+        (await this.redirectToCreateKey(origin, createPath ?? DEFAULT_CREATE_PATH, params)));
     if (!client) {
       return;
     }

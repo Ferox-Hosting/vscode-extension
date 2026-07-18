@@ -30,12 +30,13 @@ Browse and edit [Ferox Hosting](https://feroxhosting.nl) server files and access
 The extension registers a `ferox` URI handler. Open a server (mounting its files as a workspace folder) with:
 
 ```
-vscode://FeroxHosting.ferox/open?origin=<panel-url>&server=<server-uuid>
+vscode://FeroxHosting.ferox/open?server=<server-uuid>
 ```
+
+Deep links always target `https://panel.ferox.host`.
 
 | Param | Description |
 | --- | --- |
-| `origin` | Panel base URL, e.g. `https://panel.example.com`. Required. |
 | `server` | Server UUID. Required. |
 | `apiKey` | Optional API key for an ephemeral, non-persisted session. |
 | `console` | When truthy (`1`/`true`), also attach to the server console. |

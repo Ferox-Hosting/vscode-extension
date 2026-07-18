@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import { authenticateViaBrowser, normalizeFilePath } from './auth.ts';
 import type { PanelClient } from './api/client.ts';
+import { authenticateViaBrowser, normalizeFilePath } from './auth.ts';
 import { serverUri } from './fs/fileSystemProvider.ts';
 import { log } from './log.ts';
 import { type MountedServer, mountWillReload, openServerFolder, shortId } from './servers.ts';
-import type { Session } from './session.ts';
+import { DEFAULT_PANEL_ORIGIN, type Session } from './session.ts';
 
 export const PENDING_CONSOLE_KEY = 'ferox.pendingConsole';
 export const PENDING_EXPLORER_KEY = 'ferox.pendingExplorer';
@@ -33,18 +33,24 @@ export class FeroxUriHandler implements vscode.UriHandler {
     if (uri.path !== '/open') {
       return;
     }
-    await this.handleOpen(uri, new URLSearchParams(uri.query));
+    try {
+      await this.handleOpen(uri, new URLSearchParams(uri.query));
+    } catch (err) {
+      // Without this the handler dies silently and the link just appears to do nothing.
+      log.error(`uri handler: failed to open ${uri.toString()}: ${err}`);
+      vscode.window.showErrorMessage(`Ferox: could not open that link: ${err}`);
+    }
   }
 
   private async handleOpen(uri: vscode.Uri, params: URLSearchParams): Promise<void> {
-    const origin = params.get('origin');
+    const origin = DEFAULT_PANEL_ORIGIN;
     const server = params.get('server');
     const apiKey = params.get('apiKey');
     const createPath = params.get('create_path');
     const wantConsole = isTruthy(params.get('console'));
     const fileParam = params.get('file');
 
-    if (!origin || !server) {
+    if (!server) {
       log.error(`uri handler: malformed open link: ${uri.toString()}`);
       vscode.window.showErrorMessage('Ferox: malformed open link.');
       return;
@@ -77,10 +83,15 @@ export class FeroxUriHandler implements vscode.UriHandler {
     const wantConsole = isTruthy(params.get('console'));
     const fileParam = params.get('file');
 
+    // The link may carry either the short identifier or the full UUID. Mounts are keyed by full
+    // UUID, so normalize via the fetch below — otherwise the folder we add never matches the one
+    // the server list mounts, and the server appears to open into a second, empty copy.
     let name = shortId(server);
+    let uuid = server;
     try {
       const fetched = await client.getServer(server);
       name = fetched.name || name;
+      uuid = fetched.uuid || uuid;
       if (fetched.suspended) {
         log.info(`uri handler: refusing to open suspended server ${server}`);
         vscode.window.showWarningMessage(`Ferox: "${name}" is suspended and cannot be opened.`);
@@ -90,7 +101,7 @@ export class FeroxUriHandler implements vscode.UriHandler {
       log.warn(`uri handler: could not fetch name for server ${server}: ${err}`);
     }
 
-    const target: MountedServer = { origin: client.origin, uuid: server, name };
+    const target: MountedServer = { origin: client.origin, uuid, name };
     const fileUri = fileParam ? serverUri(target.origin, target.uuid, normalizeFilePath(fileParam)) : undefined;
 
     const willReload = mountWillReload(target);

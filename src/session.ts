@@ -101,7 +101,7 @@ export class Session {
     const origin = await vscode.window.showInputBox({
       title: 'Ferox: Panel URL',
       prompt: 'The URL of your Ferox panel',
-      value: presetOrigin ?? 'https://panel.ferox.host',
+      value: presetOrigin ?? DEFAULT_PANEL_ORIGIN,
       ignoreFocusOut: true,
       validateInput: (value) => {
         try {
